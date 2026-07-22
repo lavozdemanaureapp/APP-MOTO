@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moto Express - Conductor</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #111827; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .phone-container { width: 100%; max-width: 400px; background: #1f2937; height: 100vh; max-height: 750px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .header { background-color: #374151; padding: 15px; text-align: center; border-bottom: 2px solid #10b981; }
+        .content { padding: 15px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        /* Modal / Pantalla de Registro */
+        .login-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background:#1f2937; z-index: 10; padding: 25px; display: flex; flex-direction: column; justify-content: center; gap: 15px; }
+        .login-overlay h2 { color: #10b981; text-align: center; font-size: 1.5rem; }
+        .login-overlay p { text-align: center; color: #9ca3af; font-size: 0.9rem; margin-bottom: 10px; }
+        
+        input { width: 100%; padding: 12px; border: 1px solid #4b5563; background: #374151; color: white; border-radius: 8px; font-size: 1rem; outline: none; }
+        input:focus { border-color: #10b981; }
+
+        .sound-banner { background: #f59e0b; color: #111827; padding: 10px; font-size: 0.8rem; text-align: center; font-weight: bold; cursor: pointer; }
+        .trip-card { background: #374151; border-radius: 12px; padding: 15px; border-left: 5px solid #10b981; display: flex; flex-direction: column; gap: 8px; animation: pulse 1.5s infinite alternate; }
+        @keyframes pulse { 0% { border-left-color: #10b981; } 100% { border-left-color: #f59e0b; } }
+        
+        .badge { background: #10b981; color: white; padding: 3px 8px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; width: fit-content; }
+        .btn-accept { background: #10b981; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 5px; width:100%; }
+        .btn-accept:hover { background: #059669; }
+        .no-trips { text-align: center; color: #9ca3af; margin-top: 50px; }
+    </style>
+</head>
+<body>
+
+<div class="phone-container">
+    <!-- PANTALLA DE INGRESO DEL CONDUCTOR -->
+    <div id="login-modal" class="login-overlay">
+        <h2>Registro Conductor</h2>
+        <p>Ingresa tus datos para empezar a recibir viajes en Santa Ana</p>
+        <input type="text" id="driver-name-input" placeholder="Nombre y Apellido">
+        <input type="text" id="driver-plate-input" placeholder="Placa de la Moto (ej: AB1C23)">
+        <button class="btn-accept" onclick="guardarDatosConductor()">INGRESAR A TRABAJAR</button>
+    </div>
+
+    <!-- BANNER DE SONIDO -->
+    <div class="sound-banner" id="sound-btn" onclick="activarSonido()">
+        🔔 Toca aquí para Activar Alertas de Sonido
+    </div>
+
+    <!-- PANEL PRINCIPAL -->
+    <div class="header">
+        <h2 id="driver-title-display">Panel Conductor</h2>
+        <p style="font-size:0.85rem; color:#10b981;">🟢 Disponible • <span id="driver-plate-display">---</span></p>
+    </div>
+
+    <div class="content" id="trips-container">
+        <p class="no-trips">Buscando solicitudes en tiempo real...</p>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCCnHDJlsuxxvwpiuNlmRYXKskyZVkyO3A",
+      authDomain: "appmoto-5ea5c.firebaseapp.com",
+      projectId: "appmoto-5ea5c",
+      storageBucket: "appmoto-5ea5c.firebasestorage.app",
+      messagingSenderId: "172166379623",
+      appId: "1:172166379623:web:4b3ec6c8bc3aacd26d3cc2",
+      measurementId: "G-JT7NSCX09V"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let audioCtx = null;
+    let audioEnabled = false;
+    let conductorActual = { nombre: "", placa: "" };
+
+    // Verificar si ya existen datos guardados en el teléfono
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedName = localStorage.getItem('moto_driver_name');
+        const savedPlate = localStorage.getItem('moto_driver_plate');
+
+        if (savedName && savedPlate) {
+            conductorActual = { nombre: savedName, placa: savedPlate };
+            document.getElementById('login-modal').style.display = 'none';
+            document.getElementById('driver-title-display').innerText = savedName;
+            document.getElementById('driver-plate-display').innerText = savedPlate;
+        }
+    });
+
+    window.guardarDatosConductor = () => {
+        const name = document.getElementById('driver-name-input').value.trim();
+        const plate = document.getElementById('driver-plate-input').value.trim();
+
+        if (!name || !plate) {
+            alert("Por favor completa tu nombre y la placa de la moto.");
+            return;
+        }
+
+        localStorage.setItem('moto_driver_name', name);
+        localStorage.setItem('moto_driver_plate', plate);
+        conductorActual = { nombre: name, placa: plate };
+
+        document.getElementById('login-modal').style.display = 'none';
+        document.getElementById('driver-title-display').innerText = name;
+        document.getElementById('driver-plate-display').innerText = plate;
+    };
+
+    window.activarSonido = () => {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioEnabled = true;
+        document.getElementById('sound-btn').style.background = "#10b981";
+        document.getElementById('sound-btn').style.color = "#ffffff";
+        document.getElementById('sound-btn').innerText = "🔊 Alertas de Sonido ACTIVADAS";
+    };
+
+    function emitirPitidoAlerta() {
+        if (!audioEnabled || !audioCtx) return;
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        } catch(e) { console.log(e); }
+    }
+
+    const container = document.getElementById('trips-container');
+    let primerCarga = true;
+
+    const q = query(collection(db, "viajes"), where("estado", "==", "PENDIENTE"));
+
+    onSnapshot(q, (snapshot) => {
+        container.innerHTML = "";
+
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="no-trips">Buscando solicitudes en tiempo real...</p>';
+            return;
+        }
+
+        if (!primerCarga) emitirPitidoAlerta();
+        primerCarga = false;
+
+        snapshot.forEach((docSnap) => {
+            const viaje = docSnap.data();
+            const id = docSnap.id;
+
+            const card = document.createElement('div');
+            card.className = 'trip-card';
+            card.innerHTML = `
+                <span class="badge">Carrera ${viaje.tipoCarrera}</span>
+                <p style="margin-top:5px;">📍 <strong>Ubicación:</strong> ${viaje.ubicacion}</p>
+                <p>💵 <strong>Pago:</strong> ${viaje.pago}</p>
+                <button class="btn-accept" onclick="aceptarCarrera('${id}')">ACEPTAR CARRERA</button>
+            `;
+            container.appendChild(card);
+        });
+    });
+
+    window.aceptarCarrera = async (tripId) => {
+        try {
+            await updateDoc(doc(db, "viajes", tripId), {
+                estado: "ACEPTADO",
+                conductor: conductorActual
+            });
+            alert("¡Carrera aceptada! Dirígete al punto especificado.");
+        } catch (e) {
+            console.error("Error al aceptar: ", e);
+        }
+    };
+</script>
+
+</body>
+</html>
