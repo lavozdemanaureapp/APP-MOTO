@@ -1,167 +1,84 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moto Express - Cliente</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .phone-container { width: 100%; max-width: 400px; background: #fff; height: 100vh; max-height: 750px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
-        .header { background-color: #10b981; color: white; padding: 20px; text-align: center; }
-        .header h1 { font-size: 1.4rem; }
-        .header p { font-size: 0.85rem; opacity: 0.9; }
-        .content { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
-        .section-title { font-size: 0.85rem; font-weight: bold; color: #4b5563; text-transform: uppercase; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; outline: none; }
-        .fare-options { display: flex; gap: 10px; }
-        .fare-card { flex: 1; border: 2px solid #e5e7eb; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
-        .fare-card.selected { border-color: #10b981; background-color: #ecfdf5; }
-        .fare-card h3 { font-size: 1rem; color: #1f2937; }
-        .fare-card span { font-size: 0.8rem; color: #6b7280; }
-        .btn-primary { background-color: #10b981; color: white; border: none; padding: 15px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: auto; width: 100%; }
-        .status-box { display: none; text-align: center; padding: 20px; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aplicación con Mapa - Santa Ana del Táchira</title>
+
+  <!-- Librería de Mapa Gratuito (Leaflet CSS) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 16px;
+      background-color: #f4f6f8;
+      color: #1a1a1a;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Contenedor del Mapa */
+    #map {
+      height: 250px;
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      z-index: 1; /* Previene conflictos visuales */
+    }
+  </style>
 </head>
 <body>
 
-<div class="phone-container">
-    <div class="header">
-        <h1>Moto Express</h1>
-        <p>Santa Ana del Táchira - Cliente</p>
-    </div>
+  <div class="container">
+    <!-- Contenedor del Mapa -->
+    <div id="map"></div>
+  </div>
 
-    <!-- FORMULARIO DE PEDIDO -->
-    <div id="booking-view" class="content">
-        <div>
-            <span class="section-title">1. Tu Ubicación / Referencia</span>
-            <input type="text" id="origin" placeholder="Ej: Frente a la Plaza Bolívar, casa azul">
-        </div>
+  <!-- Librería de Mapa Gratuito (Leaflet JS) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-        <div>
-            <span class="section-title">2. Selecciona la Carrera</span>
-            <div class="fare-options">
-                <div class="fare-card selected" id="opt-corta" onclick="selectFare('Corta')">
-                    <h3>Corta</h3>
-                    <span>Casco central</span>
-                </div>
-                <div class="fare-card" id="opt-larga" onclick="selectFare('Larga')">
-                    <h3>Larga</h3>
-                    <span>Afueras / Subidas</span>
-                </div>
-            </div>
-        </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Coordenadas de Santa Ana del Táchira
+      const lat = 7.6441;
+      const lng = -72.2858;
 
-        <div>
-            <span class="section-title">3. Método de Pago</span>
-            <select id="payment-method">
-                <option value="Efectivo">Efectivo</option>
-                <option value="Pago Móvil">Pago Móvil</option>
-            </select>
-        </div>
+      // Inicializar el mapa
+      const map = L.map('map').setView([lat, lng], 15);
 
-        <button class="btn-primary" onclick="pedirMoto()">SOLICITAR MOTO</button>
-    </div>
+      // Cargar las baldosas gratuitas de OpenStreetMap
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
 
-    <!-- PANTALLA DE ESPERA -->
-    <div id="status-view" class="status-box">
-        <h2 id="status-title">Buscando conductor...</h2>
-        <div class="spinner" id="spinner"></div>
-        <p id="status-desc">Notificando a los motorizados disponibles en Santa Ana.</p>
+      // Agregar marcador arrastrable de la ubicación
+      const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
 
-        <div id="driver-details" style="display: none; margin-top: 20px; background: #ecfdf5; padding: 15px; border-radius: 10px; width: 100%; text-align: left;">
-            <p style="color: #065f46; font-weight: bold;">¡Carrera Aceptada!</p>
-            <p style="margin-top:5px;">🏍️ Conductor: <strong id="driver-name">-</strong></p>
-            <p>📄 Placa: <strong id="driver-plate">-</strong></p>
-        </div>
+      // Obtener coordenadas al mover el marcador
+      marker.on('dragend', function (e) {
+        const position = marker.getLatLng();
+        console.log(`Nueva ubicación: ${position.lat}, ${position.lng}`);
+      });
 
-        <button class="btn-primary" id="btn-cancel" style="background:#ef4444; margin-top:20px;" onclick="cancelarPedido()">CANCELAR PEDIDO</button>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCCnHDJlsuxxvwpiuNlmRYXKskyZVkyO3A",
-      authDomain: "appmoto-5ea5c.firebaseapp.com",
-      projectId: "appmoto-5ea5c",
-      storageBucket: "appmoto-5ea5c.firebasestorage.app",
-      messagingSenderId: "172166379623",
-      appId: "1:172166379623:web:4b3ec6c8bc3aacd26d3cc2",
-      measurementId: "G-JT7NSCX09V"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    let currentTripId = null;
-    let selectedFare = 'Corta';
-    let unsubscribeListener = null;
-
-    window.selectFare = (type) => {
-        selectedFare = type;
-        document.getElementById('opt-corta').classList.toggle('selected', type === 'Corta');
-        document.getElementById('opt-larga').classList.toggle('selected', type === 'Larga');
-    };
-
-    window.pedirMoto = async () => {
-        const origin = document.getElementById('origin').value.trim();
-        const payment = document.getElementById('payment-method').value;
-
-        if (!origin) {
-            alert("Por favor escribe tu ubicación o referencia.");
-            return;
-        }
-
-        document.getElementById('booking-view').style.display = 'none';
-        document.getElementById('status-view').style.display = 'flex';
-
-        try {
-            const docRef = await addDoc(collection(db, "viajes"), {
-                ubicacion: origin,
-                tipoCarrera: selectedFare,
-                pago: payment,
-                estado: "PENDIENTE",
-                fecha: new Date(),
-                conductor: null
-            });
-
-            currentTripId = docRef.id;
-
-            unsubscribeListener = onSnapshot(doc(db, "viajes", currentTripId), (snapshot) => {
-                const data = snapshot.data();
-                if (!data) return;
-
-                if (data.estado === "ACEPTADO") {
-                    document.getElementById('status-title').innerText = "¡Moto en camino!";
-                    document.getElementById('spinner').style.display = 'none';
-                    document.getElementById('status-desc').innerText = "Tu conductor ya viene a buscarte.";
-                    document.getElementById('driver-details').style.display = 'block';
-                    document.getElementById('driver-name').innerText = data.conductor.nombre;
-                    document.getElementById('driver-plate').innerText = data.conductor.placa;
-                    document.getElementById('btn-cancel').innerText = "FINALIZAR / NUEVO VIAJE";
-                    document.getElementById('btn-cancel').style.backgroundColor = "#10b981";
-                }
-            });
-
-        } catch (error) {
-            console.error("Error al crear viaje: ", error);
-            alert("Error de conexión. Asegúrate de activar Firestore en Modo Prueba.");
-        }
-    };
-
-    window.cancelarPedido = async () => {
-        if (currentTripId) {
-            await updateDoc(doc(db, "viajes", currentTripId), { estado: "CANCELADO" });
-            if (unsubscribeListener) unsubscribeListener();
-        }
-        location.reload();
-    };
-</script>
-
+      // Forzar ajuste de renderizado por si el contenedor cambia de tamaño
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 300);
+    });
+  </script>
 </body>
 </html>
