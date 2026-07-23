@@ -12,22 +12,32 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
         .phone-container { width: 100%; max-width: 400px; background: #fff; height: 100vh; max-height: 800px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
-        .header { background-color: #10b981; color: white; padding: 20px; text-align: center; }
+        .header { background-color: #10b981; color: white; padding: 20px; text-align: center; flex-shrink: 0; }
         .header h1 { font-size: 1.4rem; }
         .header p { font-size: 0.85rem; opacity: 0.9; }
+        
+        /* Ajuste clave de scroll */
         .content { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        
         .section-title { font-size: 0.85rem; font-weight: bold; color: #4b5563; text-transform: uppercase; margin-bottom: 5px; display: block; }
         input, select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; outline: none; }
         
-        /* Estilos del Contenedor del Mapa */
-        #map { height: 200px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; z-index: 1; }
+        /* Contenedor del Mapa con tamaño estricto */
+        #map { 
+            height: 200px; 
+            width: 100%; 
+            border-radius: 12px; 
+            border: 1px solid #d1d5db; 
+            z-index: 1; 
+            flex-shrink: 0; /* Evita que el mapa tome todo el espacio */
+        }
 
         .fare-options { display: flex; gap: 10px; }
         .fare-card { flex: 1; border: 2px solid #e5e7eb; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s; }
         .fare-card.selected { border-color: #10b981; background-color: #ecfdf5; }
         .fare-card h3 { font-size: 1rem; color: #1f2937; }
         .fare-card span { font-size: 0.8rem; color: #6b7280; }
-        .btn-primary { background-color: #10b981; color: white; border: none; padding: 15px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: auto; width: 100%; }
+        .btn-primary { background-color: #10b981; color: white; border: none; padding: 15px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: auto; width: 100%; flex-shrink: 0; }
         .status-box { display: none; text-align: center; padding: 20px; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -120,6 +130,7 @@
     const defaultLng = -72.2858;
     let selectedCoords = { lat: defaultLat, lng: defaultLng };
 
+    // Inicializar mapa
     const map = L.map('map').setView([defaultLat, defaultLng], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -128,23 +139,24 @@
 
     let marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
 
-    // Actualizar coordenadas cuando el usuario arrastra el pin
-    marker.on('dragend', function (e) {
+    // Actualizar coordenadas cuando el usuario arrastra el marcador
+    marker.on('dragend', function () {
         const position = marker.getLatLng();
         selectedCoords = { lat: position.lat, lng: position.lng };
     });
 
-    // Actualizar pin si el usuario hace clic en el mapa
+    // Actualizar marcador al hacer clic en el mapa
     map.on('click', function (e) {
         marker.setLatLng(e.latlng);
         selectedCoords = { lat: e.latlng.lat, lng: e.latlng.lng };
     });
 
-    // Ajustar el mapa al renderizar
-    setTimeout(() => { map.invalidateSize(); }, 300);
+    // Recalcular tamaño del mapa al cargar la página
+    window.addEventListener('load', () => {
+        setTimeout(() => { map.invalidateSize(); }, 200);
+    });
 
-
-    // --- LÓGICA DE NEGOCIO Y FIREBASE ---
+    // --- LÓGICA DE NEGOCIO ---
     window.selectFare = (type) => {
         selectedFare = type;
         document.getElementById('opt-corta').classList.toggle('selected', type === 'Corta');
@@ -166,7 +178,7 @@
         try {
             const docRef = await addDoc(collection(db, "viajes"), {
                 ubicacion: origin,
-                coordenadas: selectedCoords, // Guardamos lat y lng en Firestore
+                coordenadas: selectedCoords,
                 tipoCarrera: selectedFare,
                 pago: payment,
                 estado: "PENDIENTE",
