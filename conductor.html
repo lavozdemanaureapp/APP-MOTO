@@ -11,33 +11,60 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .phone-container { width: 100%; max-width: 400px; background: #fff; height: 100vh; max-height: 800px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
-        .header { background-color: #1f2937; color: white; padding: 20px; text-align: center; flex-shrink: 0; }
-        .header h1 { font-size: 1.4rem; }
-        .header p { font-size: 0.85rem; color: #10b981; }
+        .phone-container { width: 100%; max-width: 400px; background: #fff; height: 100vh; max-height: 800px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
         
+        .header { background-color: #1f2937; color: white; padding: 15px 20px; text-align: center; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header p { font-size: 0.8rem; color: #10b981; }
+        .btn-profile { background: #374151; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+
         .content { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
         .trip-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
         .trip-header { display: flex; justify-content: space-between; align-items: center; }
         .badge { background: #d1fae5; color: #065f46; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 6px; }
         
-        #driver-map { height: 220px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; flex-shrink: 0; margin-top: 10px; }
+        /* Contenedor del Mapa con alto forzado */
+        #driver-map { height: 220px; min-height: 220px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; flex-shrink: 0; margin-top: 5px; z-index: 1; }
         
         .btn-accept { background-color: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
         .btn-gps { background-color: #3b82f6; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; text-decoration: none; text-align: center; display: block; box-sizing: border-box; }
         .btn-finish { background-color: #ef4444; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        
+        /* Modal / Formulario de Registro */
+        .modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10; justify-content: center; align-items: center; padding: 20px; }
+        .modal-content { background: white; padding: 20px; border-radius: 15px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+        .modal-content h2 { font-size: 1.2rem; color: #1f2937; text-align: center; }
+        .modal-content input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div class="phone-container">
     <div class="header">
-        <h1>Moto Express</h1>
-        <p>Panel de Conductor</p>
+        <div>
+            <h1>Moto Express</h1>
+            <p id="driver-status-text">Conductor no registrado</p>
+        </div>
+        <button class="btn-profile" onclick="abrirRegistro()">⚙️ Perfil</button>
     </div>
 
     <div class="content" id="trips-container">
-        <p style="text-align: center; color: #6b7280;">Buscando solicitudes en Santa Ana...</p>
+        <p style="text-align: center; color: #6b7280;">Cargando sistema...</p>
+    </div>
+
+    <!-- MODAL DE REGISTRO DE CONDUCTOR -->
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <h2>Registro de Conductor</h2>
+            <p style="font-size: 0.8rem; color: #6b7280; text-align: center;">Ingresa tus datos para empezar a aceptar carreras en Santa Ana.</p>
+            
+            <input type="text" id="reg-nombre" placeholder="Nombre y Apellido">
+            <input type="text" id="reg-telefono" placeholder="Número de Teléfono">
+            <input type="text" id="reg-placa" placeholder="Placa de la Moto (Ej: AB1C23D)">
+            <input type="text" id="reg-modelo" placeholder="Modelo / Color de la Moto">
+            
+            <button class="btn-accept" onclick="guardarPerfil()">GUARDAR Y ACTIVAR</button>
+        </div>
     </div>
 </div>
 
@@ -61,15 +88,49 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Datos del conductor actual (puedes cambiarlos por un login más adelante)
-    const miPerfil = {
-        nombre: "Carlos Pérez",
-        placa: "AB1C23D"
+    let miPerfil = null;
+
+    // Verificar si el conductor ya se registró previamente
+    function cargarPerfilLocal() {
+        const perfilGuardado = localStorage.getItem('motoexpress_driver');
+        if (perfilGuardado) {
+            miPerfil = JSON.parse(perfilGuardado);
+            document.getElementById('driver-status-text').innerText = `🟢 ${miPerfil.nombre}`;
+            document.getElementById('register-modal').style.display = 'none';
+        } else {
+            document.getElementById('register-modal').style.display = 'flex';
+        }
+    }
+
+    window.abrirRegistro = () => {
+        if(miPerfil) {
+            document.getElementById('reg-nombre').value = miPerfil.nombre || '';
+            document.getElementById('reg-telefono').value = miPerfil.telefono || '';
+            document.getElementById('reg-placa').value = miPerfil.placa || '';
+            document.getElementById('reg-modelo').value = miPerfil.modelo || '';
+        }
+        document.getElementById('register-modal').style.display = 'flex';
     };
 
-    let activeMap = null;
+    window.guardarPerfil = () => {
+        const nombre = document.getElementById('reg-nombre').value.trim();
+        const telefono = document.getElementById('reg-telefono').value.trim();
+        const placa = document.getElementById('reg-placa').value.trim();
+        const modelo = document.getElementById('reg-modelo').value.trim();
 
-    // Escuchar carreras pendientes
+        if (!nombre || !placa) {
+            alert("Por favor ingresa al menos tu Nombre y la Placa de la moto.");
+            return;
+        }
+
+        miPerfil = { nombre, telefono, placa, modelo };
+        localStorage.setItem('motoexpress_driver', JSON.stringify(miPerfil));
+        
+        document.getElementById('driver-status-text').innerText = `🟢 ${miPerfil.nombre}`;
+        document.getElementById('register-modal').style.display = 'none';
+    };
+
+    // Escuchar carreras pendientes en Firebase
     const q = query(collection(db, "viajes"), where("estado", "==", "PENDIENTE"));
 
     onSnapshot(q, (snapshot) => {
@@ -103,6 +164,12 @@
     });
 
     async function aceptarCarrera(tripId, trip) {
+        if (!miPerfil) {
+            alert("Debes registrarte primero para aceptar carreras.");
+            document.getElementById('register-modal').style.display = 'flex';
+            return;
+        }
+
         try {
             await updateDoc(doc(db, "viajes", tripId), {
                 estado: "ACEPTADO",
@@ -119,11 +186,10 @@
     function mostrarMapaYDetalles(trip, tripId) {
         const container = document.getElementById('trips-container');
         
-        // Coordenadas recibidas del cliente (o las por defecto si no marcó)
-        const lat = trip.coordenadas ? trip.coordenadas.lat : 7.6441;
-        const lng = trip.coordenadas ? trip.coordenadas.lng : -72.2858;
+        // Coordenadas recibidas del cliente o coordenadas por defecto de Santa Ana
+        const lat = (trip.coordenadas && trip.coordenadas.lat) ? trip.coordenadas.lat : 7.6441;
+        const lng = (trip.coordenadas && trip.coordenadas.lng) ? trip.coordenadas.lng : -72.2858;
 
-        // Enlace directo a Google Maps para navegación GPS giro a giro
         const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
         container.innerHTML = `
@@ -134,7 +200,7 @@
                 </div>
                 <p>📍 <strong>Referencia:</strong> ${trip.ubicacion}</p>
                 
-                <!-- Mapa de la ubicación del cliente -->
+                <!-- Contenedor del Mapa -->
                 <div id="driver-map"></div>
 
                 <!-- Botón de GPS -->
@@ -144,24 +210,30 @@
             </div>
         `;
 
-        // Renderizar mapa
-        activeMap = L.map('driver-map').setView([lat, lng], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(activeMap);
+        // INICIALIZACIÓN DEL MAPA CON RETRASO CONTROLADO
+        setTimeout(() => {
+            const driverMap = L.map('driver-map').setView([lat, lng], 16);
 
-        // Marcador del cliente
-        L.marker([lat, lng]).addTo(activeMap)
-            .bindPopup(`Cliente: ${trip.ubicacion}`)
-            .openPopup();
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(driverMap);
 
-        setTimeout(() => { activeMap.invalidateSize(); }, 200);
+            L.marker([lat, lng]).addTo(driverMap)
+                .bindPopup(`Ubicación cliente: ${trip.ubicacion}`)
+                .openPopup();
+
+            // Forzar recálculo del contenedor para evitar la pantalla gris
+            driverMap.invalidateSize();
+        }, 300);
 
         document.getElementById('btn-finish').addEventListener('click', async () => {
             await updateDoc(doc(db, "viajes", tripId), { estado: "FINALIZADO" });
             location.reload();
         });
     }
+
+    // Cargar estado inicial
+    cargarPerfilLocal();
 </script>
 
 </body>
